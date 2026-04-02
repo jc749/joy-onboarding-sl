@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 
   let saved = 0
   let failed = 0
+  let firstError: unknown = null
 
   for (const entry of entries) {
     try {
@@ -44,11 +45,18 @@ export async function POST(request: Request) {
           }
         })
       })
-      if (res.ok) saved++; else failed++
+      if (res.ok) {
+        saved++
+      } else {
+        const err = await res.json()
+        console.error(`Failed [${entry.id}]:`, JSON.stringify(err))
+        if (!firstError) firstError = err
+        failed++
+      }
     } catch {
       failed++
     }
   }
 
-  return NextResponse.json({ saved, failed })
+  return NextResponse.json({ saved, failed, firstError })
 }
