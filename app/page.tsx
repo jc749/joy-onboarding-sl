@@ -249,6 +249,8 @@ export default function OnboardingForm() {
       setSaving(false)
       if (res.ok && data.failed === 0) {
         setDone(true)
+      } else if (data.error) {
+        showToast(data.error, 'err')
       } else {
         const errMsg = data.firstError ? JSON.stringify(data.firstError) : 'Check Notion connection.'
         showToast(`${data.saved ?? 0} saved, ${data.failed ?? entries.length} failed. ${errMsg}`, 'err')
