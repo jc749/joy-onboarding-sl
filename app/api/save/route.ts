@@ -14,13 +14,9 @@ interface SaveRequest {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  const notionToken = process.env.NOTION_MCP_TOKEN
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
-  }
-  if (!notionToken) {
-    return NextResponse.json({ error: 'NOTION_MCP_TOKEN not configured' }, { status: 500 })
+  const notionKey = process.env.NOTION_API_KEY
+  if (!notionKey) {
+    return NextResponse.json({ error: 'NOTION_API_KEY not configured' }, { status: 500 })
   }
 
   const { db, entries }: SaveRequest = await request.json()
@@ -30,31 +26,22 @@ export async function POST(request: Request) {
 
   for (const entry of entries) {
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://api.notion.com/v1/pages', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${notionKey}`,
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'mcp-client-2025-04-04',
+          'Notion-Version': '2022-06-28',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are a Notion API assistant. Create a page in Notion database ID "${db}" with these exact properties:
-- Question ID (title): "${entry.id}"
-- Question (rich_text): ${JSON.stringify(entry.text)}
-- Answer (rich_text): ${JSON.stringify(entry.answer)}
-- Section (select): "${entry.section}"
-- Layer (select): "${entry.layer}"
-Respond only with "created".`,
-          messages: [{ role: 'user', content: `Create page for ${entry.id}.` }],
-          mcp_servers: [{
-            type: 'url',
-            url: 'https://mcp.notion.com/mcp',
-            name: 'notion-mcp',
-            authorization_token: notionToken
-          }]
+          parent: { database_id: db },
+          properties: {
+            'Question ID': { title: [{ text: { content: entry.id } }] },
+            'Question': { rich_text: [{ text: { content: entry.text } }] },
+            'Answer': { rich_text: [{ text: { content: entry.answer } }] },
+            'Section': { select: { name: entry.section } },
+            'Layer': { select: { name: entry.layer } },
+          }
         })
       })
       if (res.ok) saved++; else failed++
