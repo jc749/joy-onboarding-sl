@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 const DB = '2b5e1a33-e63f-456e-9a7e-e45b4ef7b273'
 
@@ -231,37 +231,30 @@ export default function OnboardingForm() {
     const allQ = sections.flatMap(s => s.questions)
     const sectionMap: Record<string, typeof sections[0]> = {}
     sections.forEach(s => s.questions.forEach(q => { sectionMap[q.id] = s }))
-    let saved = 0, failed = 0
-    for (const q of allQ) {
+
+    const entries = allQ.map(q => {
       const raw = answers[q.id]
       const answerStr = Array.isArray(raw) ? raw.join(', ') : raw || ''
       const s = sectionMap[q.id]
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1000,
-            system: `You are a Notion API assistant. Create a page in Notion database ID "${DB}" with these exact properties:
-- Question ID (title): "${q.id}"
-- Question (rich_text): ${JSON.stringify(q.text)}
-- Answer (rich_text): ${JSON.stringify(answerStr)}
-- Section (select): "${s.title}"
-- Layer (select): "${s.layer}"
-Respond only with "created".`,
-            messages: [{ role: 'user', content: `Create page for ${q.id}.` }],
-            mcp_servers: [{ type: 'url', url: 'https://mcp.notion.com/mcp', name: 'notion-mcp' }]
-          })
-        })
-        if (res.ok) saved++; else failed++
-      } catch { failed++ }
-    }
-    setSaving(false)
-    if (failed === 0) {
-      setDone(true)
-    } else {
-      showToast(`${saved} saved, ${failed} failed. Check Notion connection.`, 'err')
+      return { id: q.id, text: q.text, answer: answerStr, section: s.title, layer: s.layer }
+    })
+
+    try {
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db: DB, entries })
+      })
+      const data = await res.json()
+      setSaving(false)
+      if (res.ok && data.failed === 0) {
+        setDone(true)
+      } else {
+        showToast(`${data.saved ?? 0} saved, ${data.failed ?? entries.length} failed. Check Notion connection.`, 'err')
+      }
+    } catch {
+      setSaving(false)
+      showToast('Save failed. Please try again.', 'err')
     }
   }
 
