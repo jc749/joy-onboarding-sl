@@ -15,8 +15,12 @@ interface SaveRequest {
 
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY
+  const notionToken = process.env.NOTION_MCP_TOKEN
   if (!apiKey) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
+  }
+  if (!notionToken) {
+    return NextResponse.json({ error: 'NOTION_MCP_TOKEN not configured' }, { status: 500 })
   }
 
   const { db, entries }: SaveRequest = await request.json()
@@ -45,7 +49,12 @@ export async function POST(request: Request) {
 - Layer (select): "${entry.layer}"
 Respond only with "created".`,
           messages: [{ role: 'user', content: `Create page for ${entry.id}.` }],
-          mcp_servers: [{ type: 'url', url: 'https://mcp.notion.com/mcp', name: 'notion-mcp' }]
+          mcp_servers: [{
+            type: 'url',
+            url: 'https://mcp.notion.com/mcp',
+            name: 'notion-mcp',
+            authorization_token: notionToken
+          }]
         })
       })
       if (res.ok) saved++; else failed++
